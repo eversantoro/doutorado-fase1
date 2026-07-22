@@ -26,12 +26,13 @@ public class HeatmapService {
         List<PacientePSR> pacientes = repository.findAll();
         List<double[]> pontos = new ArrayList<>(pacientes.size());
         for (PacientePSR p : pacientes) {
-            Point geom = p.getGeom();
+            Point geom = p.getCoordenada();
             if (geom == null) {
                 continue;
             }
-            // leaflet-heat: [lat, lng, intensity]
-            double intensidade = p.getNivelVulnerabilidade() / 5.0;
+            double intensidade = p.getProbabilidadeIa() != null
+                    ? p.getProbabilidadeIa()
+                    : p.getNivelVulnerabilidade() / 5.0;
             pontos.add(new double[]{geom.getY(), geom.getX(), intensidade});
         }
         return pontos;
@@ -43,7 +44,7 @@ public class HeatmapService {
         List<Map<String, Object>> features = new ArrayList<>();
 
         for (PacientePSR p : pacientes) {
-            Point geom = p.getGeom();
+            Point geom = p.getCoordenada();
             if (geom == null) {
                 continue;
             }
@@ -55,6 +56,8 @@ public class HeatmapService {
             Map<String, Object> properties = new HashMap<>();
             properties.put("id", p.getId());
             properties.put("nivel_vulnerabilidade", p.getNivelVulnerabilidade());
+            properties.put("probabilidade_ia", p.getProbabilidadeIa());
+            properties.put("cluster_id", p.getClusterId());
             properties.put("sexo", p.getSexo());
             properties.put("faixa_etaria", p.getFaixaEtaria());
 

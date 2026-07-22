@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>SAD Consultório na Rua — Zonas de Calor</title>
+    <title>SAD Consultório na Rua — Predições IA</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <link rel="stylesheet" th:href="@{/css/style.css}"/>
@@ -14,40 +14,31 @@
         <span class="brand-mark">CnR</span>
         <div>
             <h1>Sistema de Apoio à Decisão</h1>
-            <p>Consultório na Rua — mapa de vulnerabilidade territorial (Bauru-SP)</p>
+            <p>Consultório na Rua — zonas de calor preditas por IA (Bauru-SP)</p>
         </div>
     </div>
     <div class="stats" id="stats">
         <span id="totalPacientes">0 pacientes</span>
+        <span id="totalZonas">· 0 zonas</span>
     </div>
 </header>
 
 <main class="layout">
     <aside class="panel">
-        <h2>Importar dados</h2>
-        <p class="hint">Envie o CSV gerado por <code>scripts/gerar_mock_bauru.py</code>
-            (colunas: latitude, longitude, nivel_vulnerabilidade).</p>
+        <h2>Pipeline de IA</h2>
+        <p class="hint">Os dados do mapa vêm do modelo Python
+            (<code>scripts/modelo_preditivo_ia.py</code>
+            (K-Means + KDE), persistidos no PostGIS.</p>
 
-        <form id="uploadForm">
-            <label class="file-label">
-                <input type="file" id="csvFile" name="file" accept=".csv,text/csv" required/>
-                <span>Selecionar CSV</span>
-            </label>
-            <label class="check">
-                <input type="checkbox" id="limpar" checked/>
-                Substituir dados existentes
-            </label>
-            <button type="submit" id="btnUpload">Importar e atualizar mapa</button>
-        </form>
-
+        <button type="button" id="btnRefresh">Atualizar heatmap</button>
         <div id="uploadStatus" class="status" aria-live="polite"></div>
 
         <section class="legend">
-            <h3>Legenda</h3>
+            <h3>Legenda (probabilidade_ia)</h3>
             <ul>
-                <li><span class="swatch low"></span> Menor vulnerabilidade / densidade</li>
+                <li><span class="swatch low"></span> Menor densidade / vulnerabilidade</li>
                 <li><span class="swatch mid"></span> Intermediária</li>
-                <li><span class="swatch high"></span> Alta concentração / vulnerabilidade</li>
+                <li><span class="swatch high"></span> Alta concentração predita</li>
             </ul>
         </section>
     </aside>

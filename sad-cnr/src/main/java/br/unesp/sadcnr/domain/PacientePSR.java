@@ -32,9 +32,15 @@ public class PacientePSR {
     @Column(name = "nivel_vulnerabilidade", nullable = false)
     private Short nivelVulnerabilidade;
 
+    @Column(name = "probabilidade_ia")
+    private Double probabilidadeIa;
+
+    @Column(name = "cluster_id")
+    private Integer clusterId;
+
     @JdbcTypeCode(SqlTypes.GEOMETRY)
-    @Column(columnDefinition = "geometry(Point,4326)", nullable = false)
-    private Point geom;
+    @Column(name = "coordenada", columnDefinition = "geometry(Point,4326)", nullable = false)
+    private Point coordenada;
 
     @Column(name = "criado_em", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime criadoEm;
@@ -79,12 +85,28 @@ public class PacientePSR {
         this.nivelVulnerabilidade = nivelVulnerabilidade;
     }
 
-    public Point getGeom() {
-        return geom;
+    public Double getProbabilidadeIa() {
+        return probabilidadeIa;
     }
 
-    public void setGeom(Point geom) {
-        this.geom = geom;
+    public void setProbabilidadeIa(Double probabilidadeIa) {
+        this.probabilidadeIa = probabilidadeIa;
+    }
+
+    public Integer getClusterId() {
+        return clusterId;
+    }
+
+    public void setClusterId(Integer clusterId) {
+        this.clusterId = clusterId;
+    }
+
+    public Point getCoordenada() {
+        return coordenada;
+    }
+
+    public void setCoordenada(Point coordenada) {
+        this.coordenada = coordenada;
     }
 
     public OffsetDateTime getCriadoEm() {

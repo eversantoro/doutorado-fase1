@@ -8,32 +8,60 @@
     }).addTo(map);
 
     let heatLayer = null;
+    let zonasLayer = null;
 
     const statusEl = document.getElementById("uploadStatus");
     const totalEl = document.getElementById("totalPacientes");
-    const form = document.getElementById("uploadForm");
-    const btn = document.getElementById("btnUpload");
+    const zonasEl = document.getElementById("totalZonas");
+    const btn = document.getElementById("btnRefresh");
 
     function setStatus(msg, ok) {
         statusEl.textContent = msg || "";
         statusEl.className = "status" + (ok === true ? " ok" : ok === false ? " err" : "");
     }
 
-    async function atualizarContagem() {
+    async function atualizarResumo() {
         try {
-            const res = await fetch("/api/pacientes/count");
+            const res = await fetch("/api/predicoes/resumo");
             if (!res.ok) return;
             const data = await res.json();
-            totalEl.textContent = `${data.total} pacientes`;
+            totalEl.textContent = `${data.totalPacientes} pacientes`;
+            zonasEl.textContent = `· ${data.totalZonas} zonas IA`;
         } catch (_) {
             /* ignore */
         }
     }
 
+    async function carregarZonas() {
+        const res = await fetch("/api/predicoes/zonas");
+        if (!res.ok) return;
+        const geojson = await res.json();
+        if (zonasLayer) {
+            map.removeLayer(zonasLayer);
+        }
+        zonasLayer = L.geoJSON(geojson, {
+            pointToLayer: (feature, latlng) => {
+                const intens = feature.properties.intensidade || 0.5;
+                return L.circleMarker(latlng, {
+                    radius: 8 + intens * 10,
+                    color: "#c53030",
+                    weight: 1,
+                    fillColor: "#e53e3e",
+                    fillOpacity: 0.35
+                }).bindPopup(
+                    `<strong>${feature.properties.rotulo || "Zona"}</strong><br/>` +
+                    `Intensidade: ${(intens * 100).toFixed(0)}%<br/>` +
+                    `Pacientes: ${feature.properties.n_pacientes}<br/>` +
+                    `Método: ${feature.properties.metodo}`
+                );
+            }
+        }).addTo(map);
+    }
+
     async function carregarHeatmap() {
-        const res = await fetch("/api/pacientes/heatmap");
+        const res = await fetch("/api/predicoes/heatmap");
         if (!res.ok) {
-            throw new Error("Falha ao carregar heatmap");
+            throw new Error("Falha ao carregar /api/predicoes/heatmap");
         }
         const pontos = await res.json();
         if (heatLayer) {
@@ -56,35 +84,24 @@
             const bounds = L.latLngBounds(pontos.map((p) => [p[0], p[1]]));
             map.fitBounds(bounds.pad(0.15));
         }
-        await atualizarContagem();
+        await carregarZonas();
+        await atualizarResumo();
         return pontos.length;
     }
 
-    form.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        const fileInput = document.getElementById("csvFile");
-        const limpar = document.getElementById("limpar").checked;
-        if (!fileInput.files || fileInput.files.length === 0) {
-            setStatus("Selecione um arquivo CSV.", false);
-            return;
-        }
-
-        const fd = new FormData();
-        fd.append("file", fileInput.files[0]);
-
+    btn.addEventListener("click", async () => {
         btn.disabled = true;
-        setStatus("Importando...", null);
+        setStatus("Atualizando predicoes...", null);
         try {
-            const url = `/api/upload-csv?limpar=${limpar}`;
-            const res = await fetch(url, { method: "POST", body: fd });
-            const body = await res.json();
-            if (!res.ok) {
-                throw new Error(body.erro || "Erro no upload");
-            }
             const n = await carregarHeatmap();
-            setStatus(`Importados ${body.registros} registros. Heatmap com ${n} pontos.`, true);
+            setStatus(
+                n === 0
+                    ? "Sem dados. Execute: python scripts/modelo_preditivo_ia.py"
+                    : `Heatmap IA com ${n} pontos carregados.`,
+                n > 0
+            );
         } catch (err) {
-            setStatus(err.message || "Falha na importação", false);
+            setStatus(err.message || "Falha ao atualizar", false);
         } finally {
             btn.disabled = false;
         }
@@ -93,8 +110,10 @@
     carregarHeatmap()
         .then((n) => {
             if (n === 0) {
-                setStatus("Nenhum dado no banco. Importe o CSV sintético para ver as zonas de calor.", null);
+                setStatus("Nenhuma predicao no banco. Rode o pipeline Python de IA.", null);
+            } else {
+                setStatus(`Heatmap IA carregado (${n} pontos).`, true);
             }
         })
-        .catch(() => setStatus("Não foi possível carregar o mapa (API offline?).", false));
+        .catch(() => setStatus("Nao foi possivel carregar o mapa (API offline?).", false));
 })();

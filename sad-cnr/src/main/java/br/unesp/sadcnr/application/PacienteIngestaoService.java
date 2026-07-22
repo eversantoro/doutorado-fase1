@@ -67,8 +67,26 @@ public class PacienteIngestaoService {
         p.setSexo(firstNonBlank(row, "sexo"));
         p.setFaixaEtaria(firstNonBlank(row, "faixa_etaria"));
         p.setNivelVulnerabilidade(vulnerabilidade);
-        p.setGeom(geometryFactory.createPoint(new Coordinate(longitude, latitude)));
+        p.setProbabilidadeIa(parseOptionalDouble(row, "probabilidade_ia"));
+        p.setClusterId(parseOptionalInt(row, "cluster_id"));
+        p.setCoordenada(geometryFactory.createPoint(new Coordinate(longitude, latitude)));
         return p;
+    }
+
+    private static Double parseOptionalDouble(Map<String, String> row, String... keys) {
+        String raw = firstNonBlank(row, keys);
+        if (raw == null) {
+            return null;
+        }
+        return Double.parseDouble(raw.trim().replace(',', '.'));
+    }
+
+    private static Integer parseOptionalInt(Map<String, String> row, String... keys) {
+        String raw = firstNonBlank(row, keys);
+        if (raw == null) {
+            return null;
+        }
+        return Integer.parseInt(raw.trim());
     }
 
     private static double parseDouble(Map<String, String> row, String... keys) {
