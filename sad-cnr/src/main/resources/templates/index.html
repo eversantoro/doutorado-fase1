@@ -17,9 +17,16 @@
             <p>Consultório na Rua — zonas de calor preditas por IA (Bauru-SP)</p>
         </div>
     </div>
-    <div class="stats" id="stats">
-        <span id="totalPacientes">0 pacientes</span>
-        <span id="totalZonas">· 0 zonas</span>
+    <div class="top-right">
+        <nav class="nav">
+            <a class="active" th:href="@{/}">Mapa</a>
+            <a th:href="@{/importacao}">Importação</a>
+            <a href="/swagger-ui.html" target="_blank" rel="noopener">API</a>
+        </nav>
+        <div class="stats" id="stats">
+            <span id="totalPacientes">0 pacientes</span>
+            <span id="totalZonas">· 0 zonas</span>
+        </div>
     </div>
 </header>
 

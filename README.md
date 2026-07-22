@@ -1,121 +1,152 @@
 # SAD Consultório na Rua — Fase 1
 
-Sistema de Apoio à Decisão (SAD) desenvolvido no doutorado em Engenharia de Produção (UNESP / PPGEP) para apoiar a gestão logística do **Consultório na Rua** (CnR) no cuidado à População em Situação de Rua (PSR).
+Sistema de Apoio à Decisão (SAD) para o **Consultório na Rua** (CnR), desenvolvido no doutorado em Engenharia de Produção (UNESP / PPGEP — Bauru).
+
+Esta fase entrega a **fundação espacial + IA preditiva + importação municipal + MVP visual**, base para os próximos módulos de otimização (escalas e roteamento).
 
 ---
 
-## O que a aplicação faz (exatamente)
+## Sumário rápido
 
-Nesta Fase 1, a aplicação **não otimiza rotas ainda**. Ela entrega a **fundação territorial e preditiva** do SAD:
-
-1. **Simula** a distribuição espacial de ~500 pessoas em situação de rua no município de **Bauru-SP** (dados sintéticos, enquanto os microdados reais do SUS/SUAS não estão disponíveis).
-2. **Processa** esses pontos com Inteligência Artificial (aprendizado não supervisionado):
-   - **K-Means** → identifica aglomerados (clusters) no território;
-   - **KDE (Kernel Density Estimation)** → estima densidade espacial;
-   - combina densidade + nível de vulnerabilidade → gera um score `probabilidade_ia` entre 0 e 1.
-3. **Persiste** no PostGIS:
-   - pacientes com coordenada e score preditivo;
-   - **zonas de calor preditas** (polígono + centroide + intensidade média por cluster).
-4. **Exibe** em um mapa interativo (Leaflet) as manchas de calor (heatmap) e os centroides das zonas, para o gestor visualizar onde a IA aponta maior concentração de vulnerabilidade.
-
-### O que você vê na tela (`http://localhost:8081`)
-
-| Elemento | Função |
-|----------|--------|
-| **Mapa de Bauru** | Malha urbana (OpenStreetMap) centrada em Bauru-SP |
-| **Camada heatmap** | Manchas coloridas: azul/verde = menor intensidade; amarelo/vermelho = maior `probabilidade_ia` |
-| **Marcadores das zonas** | Centroides dos clusters da IA; ao clicar, mostram intensidade, nº de pacientes e método |
-| **Painel lateral** | Explica que os dados vêm do pipeline Python; botão **Atualizar heatmap** recarrega a API |
-| **Contadores** | Total de pacientes e de zonas preditas no banco |
-
-### O que a aplicação **ainda não** faz (fases seguintes)
-
-- Otimização de escalas (Nurse Rostering)
-- Roteamento de equipes (VRP / OSRM + solvers)
-- Integração oficial com e-SUS APS / CadÚnico em produção
+| Item | Link / comando |
+|------|----------------|
+| Mapa de calor | http://localhost:8081 |
+| Tela de importação | http://localhost:8081/importacao |
+| Swagger do SAD | http://localhost:8081/swagger-ui.html |
+| Swagger do microserviço | http://localhost:8090/docs |
+| Contrato CSV (prefeitura) | [`docs/FORMATO_IMPORTACAO_DADOS.md`](docs/FORMATO_IMPORTACAO_DADOS.md) |
+| Apresentação orientadora | [`docs/Apresentacao_Orientadora_Fase1_Artigos.pptx`](docs/Apresentacao_Orientadora_Fase1_Artigos.pptx) |
 
 ---
 
-## Arquitetura (visão rápida)
+## O que a aplicação faz
 
+Nesta Fase 1 a aplicação **ainda não otimiza rotas/escalas**. Ela:
+
+1. **Importa** CSV anonimizado da prefeitura via **microserviço** (validação de contrato + PostGIS).
+2. **Gera ou recalcula** predições com **Machine Learning** (K-Means + KDE) → `probabilidade_ia`.
+3. **Persiste** pacientes e **zonas de calor** no PostGIS.
+4. **Exibe** heatmap interativo (Leaflet) para apoiar a decisão territorial do CnR.
+5. **Documenta** as APIs em **Swagger/OpenAPI** nos dois serviços HTTP.
+
+### O que você vê nas telas
+
+| Tela | Conteúdo |
+|------|----------|
+| **Mapa** (`/`) | Heatmap por `probabilidade_ia`, centroides das zonas IA, contadores, botão atualizar |
+| **Importação** (`/importacao`) | Download do modelo CSV, upload, modos substituir/acrescentar, relatório de erros, status do microserviço |
+
+### O que vem nas fases seguintes
+
+- Nurse Rostering (escalas multidisciplinares)
+- VRP / OSRM + solvers (roteamento)
+- Integração oficial e-SUS / CadÚnico (com LGPD)
+
+---
+
+## Arquitetura
+
+```text
+ Prefeitura (CSV UTF-8, anonimizado)
+              │
+              ▼
+ ┌────────────────────────────────┐
+ │  Microserviço de Importação    │  FastAPI  :8090
+ │  validação + carga PostGIS     │  Swagger: /docs
+ └───────────────┬────────────────┘
+                 │
+                 ▼
+          ┌─────────────┐
+          │   PostGIS   │  :5432
+          │ pacientes / │
+          │ zonas calor │
+          └──────▲──────┘
+                 │
+     ┌───────────┴───────────┐
+     │                       │
+     │ lê                    │ grava (batch IA)
+     │                       │
+ ┌───┴────────────────┐   ┌──┴──────────────────────┐
+ │ SAD Visual         │   │ Pipeline IA             │
+ │ Spring Boot :8081  │   │ modelo_preditivo_ia.py  │
+ │ mapa + gateway     │   │ K-Means + KDE           │
+ │ Swagger UI         │   └─────────────────────────┘
+ └────────────────────┘
 ```
-┌─────────────────────┐     grava      ┌──────────────────┐     lê      ┌─────────────────────┐
-│  Python (IA)        │ ─────────────► │  PostGIS         │ ◄───────── │  Spring Boot (SAD)  │
-│  modelo_preditivo   │   pacientes +  │  pacientes_psr   │   REST     │  + Thymeleaf/Leaflet│
-│  _ia.py             │   zonas calor  │  zonas_calor_*   │            │  mapa no navegador  │
-└─────────────────────┘                └──────────────────┘            └─────────────────────┘
-```
 
-| Camada | Tecnologia | Responsabilidade |
-|--------|------------|------------------|
-| Infra | Docker + PostgreSQL 16 / PostGIS 3.4 | Banco espacial |
-| IA | Python, Scikit-learn, SQLAlchemy | Mock + ML + ingestão |
-| Backend | Java 21, Spring Boot 3, Hibernate Spatial | API e página web |
-| Frontend | Thymeleaf, Leaflet, leaflet-heat | Visualização do heatmap |
+| Componente | Stack | Porta | Responsabilidade |
+|------------|-------|-------|------------------|
+| `import-service` | Python FastAPI | **8090** | Microserviço de importação CSV |
+| `sad-cnr` | Java 21 / Spring Boot 3 | **8081** | SAD visual + gateway + Swagger |
+| PostGIS | PostgreSQL 16 + PostGIS 3.4 | **5432** | Banco espacial |
+| `modelo_preditivo_ia.py` | Scikit-learn | — | IA preditiva (job batch) |
 
-**Não há microsserviços**: um monólito Java + um script Python batch + o banco.
+> A porta **8080** costuma ficar ocupada pelo Docker Desktop neste ambiente; por isso o SAD usa **8081**.
 
 ---
 
 ## Pré-requisitos
 
-Antes de começar, tenha instalado e funcionando:
-
-1. **Docker Desktop** (ligado)
-2. **Java 21** (ex.: `C:\Program Files\Java\jdk-21`)
-3. **Maven 3.9+**
-4. **Python 3.11+**
+1. **Docker Desktop** ligado  
+2. **Java 21** (ex.: `C:\Program Files\Java\jdk-21`)  
+3. **Maven 3.9+**  
+4. **Python 3.11+** (para o pipeline de IA local; o microserviço também pode rodar via Docker)
 
 ---
 
-## Passo a passo — do zero até o mapa
+## Passo a passo (do zero ao mapa)
 
-### Passo 0 — Abrir o projeto
+### Passo 0 — Configurar ambiente
 
 ```powershell
 cd c:\java\doutorado\ZonasCalor
-```
-
-Copie as variáveis de ambiente (credenciais do banco):
-
-```powershell
 copy .env.example .env
 ```
 
----
-
-### Passo 1 — Subir o banco espacial (PostGIS)
+### Passo 1 — Subir PostGIS + microserviço de importação
 
 ```powershell
 cd c:\java\doutorado\ZonasCalor\infra
-docker compose up -d
+docker compose up -d --build
 ```
 
-Aguarde o container ficar **healthy**:
+Verificar:
 
 ```powershell
 docker ps
+curl.exe http://localhost:8090/health
+curl.exe -o NUL -w "%{http_code}" http://localhost:8090/docs
 ```
 
-Você deve ver `sad-cnr-postgis` com status healthy na porta `5432`.
+Esperado:
 
-Na **primeira** subida, o arquivo `sql/init.sql` cria automaticamente:
+- container `sad-cnr-postgis` **healthy**
+- container `sad-cnr-import` em execução
+- health `{"status":"ok","database":"up"}`
+- Swagger do import em `/docs` respondendo **200**
 
-- `pacientes_psr` (pontos + vulnerabilidade + `probabilidade_ia`)
-- `zonas_calor_preditas` (clusters da IA)
-- `bases_operacionais` e `historico_atendimentos` (preparação das fases seguintes)
-
-Se o banco **já existia** com schema antigo, rode a migração:
+**Alternativa** (microserviço fora do Docker):
 
 ```powershell
-Get-Content c:\java\doutorado\ZonasCalor\sql\migrate_v2_ia.sql | docker exec -i sad-cnr-postgis psql -U sad -d sad_cnr
+cd c:\java\doutorado\ZonasCalor\import-service
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8090
 ```
 
----
+### Passo 2 — Popular dados
 
-### Passo 2 — Rodar o pipeline de Inteligência Artificial
+#### Opção A — Prefeitura (fluxo real)
 
-Este passo **popula o banco** com dados sintéticos e com as predições.
+1. Suba o SAD (Passo 3).
+2. Abra http://localhost:8081/importacao  
+3. Baixe o **modelo CSV**.  
+4. Preencha conforme [`docs/FORMATO_IMPORTACAO_DADOS.md`](docs/FORMATO_IMPORTACAO_DADOS.md) (**sem** nome/CPF/CNS).  
+5. Importe (Substituir ou Acrescentar).  
+6. Abra o mapa e clique em **Atualizar heatmap**.
+
+#### Opção B — Dados sintéticos + IA (fluxo acadêmico)
 
 ```powershell
 cd c:\java\doutorado\ZonasCalor\scripts
@@ -125,32 +156,9 @@ pip install -r requirements.txt
 python modelo_preditivo_ia.py
 ```
 
-**O que o script faz, em ordem:**
+O script gera ~500 pacientes em Bauru, aplica **K-Means + KDE**, grava `probabilidade_ia` e `zonas_calor_preditas`.
 
-1. Gera ~500 pacientes com coordenadas dentro do bounding box de Bauru, concentrados em 4 epicentros (praça/centro, terminal, zona sul, zona norte).
-2. Aplica **K-Means** (4 clusters) para descobrir aglomerados.
-3. Aplica **KDE** para estimar densidade e calcula `probabilidade_ia`.
-4. Monta polígonos/centroides das **zonas de calor**.
-5. Grava tudo no PostGIS (substitui dados anteriores dessas tabelas).
-
-Saída esperada no terminal (exemplo):
-
-```text
-Gerando pacientes sinteticos (Bauru-SP)...
-  -> 500 pacientes
-Aplicando K-Means + KDE...
-  -> 4 zonas de calor preditas
-Persistindo no PostGIS...
-Concluido. Pacientes e zonas_calor_preditas atualizados.
-```
-
-> Sem este passo, o mapa abre, mas fica sem manchas de calor (banco vazio de predições).
-
----
-
-### Passo 3 — Subir o Sistema Visual (Spring Boot)
-
-Em um **novo** terminal PowerShell:
+### Passo 3 — Subir o SAD (Spring Boot)
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
@@ -159,47 +167,71 @@ cd c:\java\doutorado\ZonasCalor\sad-cnr
 mvn spring-boot:run
 ```
 
-Aguarde a mensagem `Started SadCnrApplication`.
+Aguarde `Started SadCnrApplication`.
 
-> A aplicação escuta na porta **8081** (a 8080 costuma estar ocupada pelo Docker Desktop neste ambiente).
+### Passo 4 — Abrir as interfaces
 
----
-
-### Passo 4 — Visualizar a tela
-
-Abra o navegador em:
-
-**http://localhost:8081**
-
-1. O frontend chama automaticamente `GET /api/predicoes/heatmap`.
-2. O Leaflet.heat desenha as zonas de calor.
-3. Os centroides das zonas da IA aparecem como marcadores clicáveis.
-4. Use **Atualizar heatmap** se tiver rodado o Python de novo com a página já aberta.
+| Interface | URL |
+|-----------|-----|
+| Mapa | http://localhost:8081 |
+| Importação | http://localhost:8081/importacao |
+| Swagger SAD | http://localhost:8081/swagger-ui.html |
+| Swagger Import | http://localhost:8090/docs |
+| ReDoc Import | http://localhost:8090/redoc |
 
 ---
 
-## Fluxo de uso no dia a dia
+## Inteligência Artificial (o que roda hoje)
 
-| Situação | O que fazer |
-|----------|-------------|
-| Primeira vez | Passos 1 → 2 → 3 → 4 |
-| Só regenerar predições | Rodar de novo `python modelo_preditivo_ia.py` e clicar **Atualizar heatmap** |
-| Reiniciar só a UI | `mvn spring-boot:run` no módulo `sad-cnr` |
-| Reiniciar o banco | `docker compose up -d` em `infra` |
-| Parar o banco | `docker compose down` em `infra` |
+| Técnica | Papel |
+|---------|--------|
+| **K-Means** | Descobre aglomerados territoriais (zonas) |
+| **KDE** | Estima densidade espacial contínua |
+| **Score híbrido** | `probabilidade_ia ≈ 0,65×densidade + 0,35×(vulnerabilidade/5)` |
+
+- Implementação: `scripts/modelo_preditivo_ia.py`  
+- Visualização: `GET /api/predicoes/heatmap` → Leaflet.heat  
+- **Não** é chatbot/LLM: é ML não supervisionado para priorização territorial.
 
 ---
 
-## APIs disponíveis
+## Documentação Swagger / OpenAPI
 
-| Método | URL | O que retorna |
-|--------|-----|----------------|
-| `GET` | `/api/predicoes/heatmap` | Lista `[[lat, lng, intensidade], ...]` para o Leaflet.heat (usa `probabilidade_ia`) |
-| `GET` | `/api/predicoes/zonas` | GeoJSON dos centroides das zonas preditas |
-| `GET` | `/api/predicoes/resumo` | Totais de pacientes e zonas + nome da fonte do modelo |
-| `GET` | `/api/pacientes/count` | Contagem de pacientes |
-| `GET` | `/api/pacientes/geojson` | GeoJSON dos pacientes |
-| `POST` | `/api/upload-csv` | Importação manual de CSV (opcional; o fluxo principal é o Python) |
+| Serviço | Swagger UI | OpenAPI JSON | ReDoc |
+|---------|------------|--------------|-------|
+| SAD Spring Boot `:8081` | [/swagger-ui.html](http://localhost:8081/swagger-ui.html) | [/v3/api-docs](http://localhost:8081/v3/api-docs) | — |
+| Import FastAPI `:8090` | [/docs](http://localhost:8090/docs) | [/openapi.json](http://localhost:8090/openapi.json) | [/redoc](http://localhost:8090/redoc) |
+
+Tags no SAD: **Predições**, **Importação**, **Pacientes**.  
+Tags no Import: **Saúde**, **Contrato**, **Importação**.
+
+---
+
+## Principais endpoints
+
+### Microserviço (`:8090`)
+
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| `GET` | `/health` | Saúde do serviço e do banco |
+| `GET` | `/api/v1/import/schema` | Contrato JSON |
+| `GET` | `/api/v1/import/template/pacientes` | CSV modelo |
+| `GET` | `/api/v1/import/template/bases` | CSV bases |
+| `POST` | `/api/v1/import/pacientes` | Importa pacientes |
+| `POST` | `/api/v1/import/bases` | Importa bases operacionais |
+
+### Gateway / SAD (`:8081`)
+
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| `GET` | `/api/importacao/health` | Proxy health |
+| `GET` | `/api/importacao/schema` | Proxy schema |
+| `GET` | `/api/importacao/template` | Proxy template |
+| `POST` | `/api/importacao/pacientes` | Proxy importação |
+| `GET` | `/api/predicoes/heatmap` | `[[lat,lng,intensidade],...]` |
+| `GET` | `/api/predicoes/zonas` | GeoJSON dos centroides |
+| `GET` | `/api/predicoes/resumo` | Totais pacientes/zonas |
+| `GET` | `/api/pacientes/count` | Contagem |
 
 ---
 
@@ -207,50 +239,50 @@ Abra o navegador em:
 
 ```text
 ZonasCalor/
+├── docs/
+│   ├── FORMATO_IMPORTACAO_DADOS.md      # contrato para prefeituras
+│   └── Apresentacao_Orientadora_*.pptx  # slides da Fase 1 + 2 artigos
+├── import-service/                      # microserviço FastAPI (+ Dockerfile)
 ├── infra/
-│   └── docker-compose.yml          # sobe o PostGIS
+│   └── docker-compose.yml               # PostGIS + import-service
 ├── sql/
-│   ├── init.sql                    # schema na 1ª instalação
-│   └── migrate_v2_ia.sql           # migração para bancos antigos
+│   ├── init.sql                         # schema inicial
+│   └── migrate_v2_ia.sql                # migração bancos antigos
 ├── scripts/
-│   ├── modelo_preditivo_ia.py      # pipeline ML (passo principal de dados)
-│   ├── gerar_mock_bauru.py         # gera CSV auxiliar (opcional)
-│   ├── distance_matrix_service.py  # preparação Fase 3 (OSRM)
-│   └── requirements.txt
-├── data/                           # saídas locais (CSV/JSON; não versionar segredos)
-├── sad-cnr/                        # aplicação Java (API + tela)
+│   ├── modelo_preditivo_ia.py           # pipeline ML
+│   ├── gerar_mock_bauru.py
+│   ├── distance_matrix_service.py       # preparação Fase 3 (OSRM)
+│   └── gerar_apresentacao_orientadora.py
+├── sad-cnr/                             # Spring Boot (UI + API + Swagger)
+├── data/                                # artefatos locais (CSV etc.)
 ├── .env.example
 └── README.md
 ```
 
 ---
 
-## Credenciais padrão do banco (desenvolvimento)
+## Credenciais e variáveis (desenvolvimento)
 
-Definidas em `.env.example` (e usadas pelo Docker / Spring / Python):
+| Variável / serviço | Valor padrão |
+|--------------------|--------------|
+| PostGIS | `localhost:5432`, db `sad_cnr`, user `sad`, senha `sad123` |
+| `IMPORT_SERVICE_URL` | `http://localhost:8090` |
+| SAD | `http://localhost:8081` |
+| Bounding box Bauru | lat `-22.40`…`-22.25`, lon `-49.15`…`-49.00` |
 
-| Variável | Valor padrão |
-|----------|--------------|
-| Host | `localhost` |
-| Porta | `5432` |
-| Database | `sad_cnr` |
-| Usuário | `sad` |
-| Senha | `sad123` |
-
-**Não** versionar o arquivo `.env` com senhas reais.
+Arquivo de referência: `.env.example` (não versionar `.env` com segredos reais).
 
 ---
 
-## Dados reais (próximos passos da pesquisa)
+## Fluxo do dia a dia
 
-Os pontos atuais são **sintéticos**. Para calibração futura:
-
-| Fonte | Uso |
-|-------|-----|
-| [CadÚnico / VisData3](https://aplicacoes.cidadania.gov.br/vis/data3/) | Totais agregados de famílias em situação de rua |
-| [Microdados SAGI/MDS](https://www.gov.br/mds/pt-br/servicos/sagi/microdados) | Bases amostrais desidentificadas |
-| [IPEA TD 2944](https://repositorio.ipea.gov.br/entities/publication/82841974-8591-413b-8db7-1472520b53cb) | Diagnóstico e método de análise CadÚnico |
-| Parceria SMS / SUAS Bauru | Coordenadas operacionais anonimizadas do CnR (respeitando LGPD) |
+| Objetivo | Ação |
+|----------|------|
+| Subir infra | `docker compose up -d --build` em `infra` |
+| Regenerar predições sintéticas | `python scripts/modelo_preditivo_ia.py` |
+| Importar CSV municipal | Tela `/importacao` ou Swagger `:8090/docs` |
+| Reiniciar só a UI | `mvn spring-boot:run` em `sad-cnr` |
+| Explorar APIs | Swagger `:8081` e `:8090` |
 
 ---
 
@@ -258,16 +290,27 @@ Os pontos atuais são **sintéticos**. Para calibração futura:
 
 | Problema | Causa provável | Solução |
 |----------|----------------|---------|
-| Mapa sem calor | Pipeline Python não rodou | Executar `modelo_preditivo_ia.py` |
-| Erro de conexão JDBC | PostGIS parado | `docker compose up -d` em `infra` |
-| Porta 8081 em uso | Outra instância Java | Encerrar o processo Java anterior e subir de novo |
-| `Schema-validation` no Spring | Banco desatualizado | Rodar `migrate_v2_ia.sql` |
-| `JAVA_HOME` aponta para Java 8 | PATH antigo | Forçar JDK 21 como no Passo 3 |
-| Docker “connection refused” | Docker Desktop desligado | Abrir o Docker Desktop e esperar ficar Ready |
+| Importação: microserviço indisponível | Container parado | `docker compose up -d --build` em `infra` |
+| CSV rejeitado | Cabeçalho/coords/LGPD | Ver `FORMATO_IMPORTACAO_DADOS.md` |
+| Mapa sem manchas | Banco sem dados | Importar CSV ou rodar pipeline IA |
+| `Schema-validation` no Spring | Schema antigo | Rodar `sql/migrate_v2_ia.sql` |
+| Porta 8081 em uso | Outra JVM | Encerrar processo Java anterior |
+| `JAVA_HOME` em Java 8 | PATH antigo | Forçar JDK 21 no Passo 3 |
+| Swagger 404 no SAD | App não subiu | Confirmar `Started SadCnrApplication` |
+
+---
+
+## Estratégia científica (resumo)
+
+- **Artigo 1:** predição territorial / zonas de calor / DSS (Fases 1–2)  
+- **Artigo 2:** otimização NRP + VRP integrada à demanda predita (Fases 3–5)  
+
+Detalhes na apresentação em `docs/`.
 
 ---
 
 ## Licença acadêmica
 
 Uso destinado à pesquisa de doutorado (UNESP — Câmpus de Bauru).  
-Os dados sintéticos **não representam** pessoas reais e não devem ser usados como estatística oficial.
+Dados sintéticos **não representam** pessoas reais.  
+Cargas municipais devem cumprir a **LGPD** (apenas identificadores anonimizados).

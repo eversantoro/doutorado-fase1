@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Importação de Dados — SAD CnR</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">
+        <span class="brand-mark">CnR</span>
+        <div>
+            <h1>Importação de dados municipais</h1>
+            <p>Carga de CSV anonimizado via microserviço de importação</p>
+        </div>
+    </div>
+    <nav class="nav">
+        <a th:href="@{/}">Mapa</a>
+        <a class="active" th:href="@{/importacao}">Importação</a>
+        <a href="/swagger-ui.html" target="_blank" rel="noopener">Swagger SAD</a>
+        <a href="http://localhost:8090/docs" target="_blank" rel="noopener">Swagger Import</a>
+    </nav>
+</header>
+
+<main class="import-layout">
+    <section class="import-card">
+        <h2>1. Baixe o modelo</h2>
+        <p class="hint">O arquivo deve seguir o contrato em
+            <code>docs/FORMATO_IMPORTACAO_DADOS.md</code> (UTF-8, vírgula, WGS84).</p>
+        <a class="btn-secondary" id="btnTemplate" href="/api/importacao/template">Baixar modelo CSV</a>
+        <div id="svcStatus" class="status" aria-live="polite">Verificando microserviço...</div>
+    </section>
+
+    <section class="import-card">
+        <h2>2. Envie o CSV da prefeitura</h2>
+        <form id="importForm">
+            <label class="file-label">
+                <input type="file" id="csvFile" name="file" accept=".csv,text/csv" required/>
+                <span>Selecionar arquivo .csv</span>
+            </label>
+
+            <label class="field">
+                Modo de carga
+                <select id="modo" name="modo">
+                    <option value="substituir" selected>Substituir dados existentes</option>
+                    <option value="acrescentar">Acrescentar aos existentes</option>
+                </select>
+            </label>
+
+            <label class="check">
+                <input type="checkbox" id="strict"/>
+                Modo estrito (aborta tudo se houver 1 linha inválida)
+            </label>
+
+            <button type="submit" id="btnImport">Importar via microserviço</button>
+        </form>
+        <div id="importStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <section class="import-card wide">
+        <h2>3. Relatório da última importação</h2>
+        <div id="reportEmpty" class="hint">Nenhuma importação nesta sessão.</div>
+        <div id="reportBox" class="report hidden">
+            <div class="report-grid">
+                <div><span class="lbl">Status</span><strong id="rStatus">—</strong></div>
+                <div><span class="lbl">Recebidas</span><strong id="rRecv">—</strong></div>
+                <div><span class="lbl">Importadas</span><strong id="rOk">—</strong></div>
+                <div><span class="lbl">Rejeitadas</span><strong id="rFail">—</strong></div>
+                <div><span class="lbl">Total no banco</span><strong id="rTotal">—</strong></div>
+            </div>
+            <h3>Erros (até 100)</h3>
+            <ul id="rErrors" class="error-list"></ul>
+            <a class="btn-secondary" th:href="@{/}">Ir para o mapa de calor</a>
+        </div>
+    </section>
+
+    <section class="import-card wide">
+        <h2>Colunas do contrato</h2>
+        <pre id="schemaBox" class="schema">Carregando schema...</pre>
+    </section>
+</main>
+
+<script th:src="@{/js/importacao.js}"></script>
+</body>
+</html>

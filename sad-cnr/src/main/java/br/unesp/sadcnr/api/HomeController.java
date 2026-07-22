@@ -10,4 +10,9 @@ public class HomeController {
     public String index() {
         return "index";
     }
+
+    @GetMapping("/importacao")
+    public String importacao() {
+        return "importacao";
+    }
 }
