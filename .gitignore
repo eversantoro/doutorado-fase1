@@ -1,0 +1,15 @@
+.env
+**/__pycache__/
+**/.venv/
+**/venv/
+*.pyc
+data/*.csv
+data/*.json
+infra/osrm-data/*
+!infra/osrm-data/.gitkeep
+sad-cnr/target/
+.idea/
+*.iml
+.vscode/
+*.log
+.DS_Store

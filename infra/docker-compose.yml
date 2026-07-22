@@ -1,0 +1,36 @@
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: sad-cnr-postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sad_cnr}
+      POSTGRES_USER: ${POSTGRES_USER:-sad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sad123}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ../sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sad} -d ${POSTGRES_DB:-sad_cnr}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Motor OSRM — habilite após processar o .pbf (ver README)
+  # osrm:
+  #   image: ghcr.io/project-osrm/osrm-backend:latest
+  #   container_name: sad-cnr-osrm
+  #   ports:
+  #     - "${OSRM_PORT:-5000}:5000"
+  #   volumes:
+  #     - ./osrm-data:/data
+  #   command: osrm-routed --algorithm mld /data/bauru-region.osrm
+  #   depends_on:
+  #     postgis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+volumes:
+  postgis_data:
